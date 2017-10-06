@@ -1,4 +1,4 @@
-import subprocess, os, json, shutil, time
+import subprocess, os, json, shutil, time, logging
 from os import system, walk, makedirs, listdir, renames
 
 
@@ -12,6 +12,12 @@ class fix_playon:
         except:
           pass
 
+      # logging
+      session_uuid = str(uuid.uuid4())
+      fmt = '%%(asctime)-15s [%s] %%(message)s' % session_uuid[:6]
+      logging.basicConfig(level=logging.INFO, format=fmt, filename="%s/fix_playon.log" % self.base_dir)
+
+
       # have some code here to allow comments in the json settings file
       settings_array = open('fix_playon_config.ini').readlines()
       settings_json = ""
@@ -20,6 +26,15 @@ class fix_playon:
           settings_json += line
       self.settings =  json.loads(settings_json)
 
+      if self.settings["console_logging"].lower() == "true":
+        console = logging.StreamHandler()
+        console.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(message)s')
+        console.setFormatter(formatter)
+        logging.getLogger('').addHandler(console)
+
+
+      # do the things
       self.action = "process"
       while self.action != "done":
         self.scan_watch_dir()
@@ -41,17 +56,19 @@ class fix_playon:
       provider = file_meta['format']['tags']['ProviderName']
     except:
       provider = "default"
+    service = self.settings['services'][provider]
+
     for chapter in chapter_list:
       if chapter['start_time'] == '0.000000' and float(chapter['start_time']) < 10.0:
         continue
       if chapter['tags']['title'] == 'Advertisement':
         continue
       cut_times.append([float(chapter['start_time']), float(chapter['end_time'])])
-    if provider == "Crackle":
-      #put in comskip code
-      pass
+
+    if service["use_comskip"].lower() == "true":
+      chapter_list = self.use_comskip(filename, file_meta)
+
     if chapter_list == []: #netflix and HBOGO movies don't have chapters
-      service = self.settings['services'][provider]
       if not service == "":
         end_time = float(file_meta['format']['duration']) - service['end_cut']
         cut_times = [[service['start_cut'],end_time]]
@@ -137,13 +154,42 @@ class fix_playon:
 
 
   def destroy_cut_files(self):
-    if self.settings['destroy_cut_files'] == "False":
+    if self.settings['destroy_cut_files'].lower() == "false":
       return
     for item in listdir(self.work_dir):
       try:
         os.unlink('%s/%s' % (self.work_dir,item))
       except:
         pass
+
+  def use_comskip(self, filename, file_meta):
+    cmd = [self.settings['comskip'], '--output', self.work_dir, '--ini', self.settings["comskip_ini_path"], filename]
+    logging.info('[comskip] Command: %s' % cmd)
+    subprocess.call(cmd)
+
+    edl_file = '%s.edl' % filename.split(".mp4")[0]
+    logging.info('Using EDL: ' + edl_file)
+    segments = []
+    prev_segment_end = 0.0
+    if os.path.exists(edl_file):
+      with open(edl_file, 'rb') as edl:
+
+        # EDL contains segments we need to drop, so chain those together into segments to keep.
+        for segment in edl:
+          start, end, something = segment.split()
+          if float(start) == 0.0:
+            logging.info('Start of file is junk, skipping this segment...')
+          else:
+            keep_segment = [float(prev_segment_end), float(start)]
+            logging.info('Keeping segment from %s to %s...' % (keep_segment[0], keep_segment[1]))
+            segments.append(keep_segment)
+          prev_segment_end = end
+
+    # Write the final keep segment from the end of the last commercial break to the end of the file.
+    keep_segment = [float(prev_segment_end), float(file_meta['format']['duration'])]
+    logging.info('Keeping segment from %s to the end of the file...' % prev_segment_end)
+    segments.append(keep_segment)
+    return segments
 
 
 if __name__ == "__main__":
