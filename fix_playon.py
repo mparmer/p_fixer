@@ -1,4 +1,4 @@
-import subprocess, os, json, shutil, time, logging
+import subprocess, os, json, shutil, time, logging, uuid
 from os import system, walk, makedirs, listdir, renames
 
 
@@ -41,7 +41,9 @@ class fix_playon:
 
 
   def get_meta(self,filename):
-    result = subprocess.Popen([self.settings['ffprobe'],'-v','quiet','-print_format','json','-show_chapters','-show_format',filename], stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+    cmd_list = [self.settings['ffprobe'],'-v','quiet','-print_format','json','-show_chapters','-show_format',filename]
+    result = subprocess.Popen(cmd_list, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+    logging.info("FFProbe command: %s" % cmd_list)
     raw_string = result.stdout.read()
     return json.loads(raw_string)
 
@@ -66,8 +68,8 @@ class fix_playon:
       cut_times.append([float(chapter['start_time']), float(chapter['end_time'])])
 
     if service["use_comskip"].lower() == "true":
-      chapter_list = self.use_comskip(filename, file_meta)
-
+      cut_times = self.use_comskip(filename, file_meta)
+      logging.info(chapter_list)
     if chapter_list == []: #netflix and HBOGO movies don't have chapters
       if not service == "":
         end_time = float(file_meta['format']['duration']) - service['end_cut']
@@ -89,6 +91,7 @@ class fix_playon:
       file_list.append(outfile)
       concat_file.write("file '%s-%s.mp4'\n" % (splitfile,count))
       cmd_list = [self.settings['ffmpeg'],'-i','%s' % filename, '-map_metadata', '-1', '-ss', str(segment[0]), '-to', str(segment[1]), '-c', 'copy', '%s' %  outfile]
+      logging.info("FFMpeg command: %s" % cmd_list)
       result = subprocess.Popen(cmd_list, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
       raw_string = result.communicate()
       count += 1
@@ -99,7 +102,7 @@ class fix_playon:
       shutil.move('%s/%s-0.mp4' % (self.work_dir,splitfile), final_out)
     else:
       cmd_list = [self.settings['ffmpeg'],'-f','concat', '-safe', '0', '-i', '%s' % concat_file_name, '-c', 'copy', '%s' %  final_out]
-      print cmd_list
+      logging.info("FFMpeg command: %s" % cmd_list)
       result = subprocess.Popen(cmd_list, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
       raw_string = result.communicate()
 
@@ -134,10 +137,9 @@ class fix_playon:
 
             print "fixed files and dirs in %s, now retrying" % root
             return "try again"
-          #if item == "Bob's Burgers - s07e18 - The Laser-Inth.mp4":
+          if item == "Unforgettable.mp4":
             #print root
-          print "made it to the convert"
-          self.convert('%s\%s' % (root, item), out_dir)
+            self.convert('%s\%s' % (root, item), out_dir)
     #when all dirs and files have been processed, set as done, and script will exit
     print "made it to the done"
     self.action = "done"
@@ -163,11 +165,11 @@ class fix_playon:
         pass
 
   def use_comskip(self, filename, file_meta):
-    cmd = [self.settings['comskip'], '--output', self.work_dir, '--ini', self.settings["comskip_ini_path"], filename]
+    cmd = [self.settings['comskip'], '--output', self.work_dir, '--ini', self.settings["comskip_ini"], filename]
     logging.info('[comskip] Command: %s' % cmd)
-    subprocess.call(cmd)
+    #subprocess.call(cmd)
 
-    edl_file = '%s.edl' % filename.split(".mp4")[0]
+    edl_file = '%s/%s.edl' % (self.work_dir,filename.split("\\")[-1].split(".mp4")[0])
     logging.info('Using EDL: ' + edl_file)
     segments = []
     prev_segment_end = 0.0
