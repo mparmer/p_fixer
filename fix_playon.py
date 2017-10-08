@@ -48,7 +48,8 @@ class fix_playon:
     return json.loads(raw_string)
 
 
-  def convert(self, filename, out_dir):
+  def convert(self, root_dir, item, out_dir):
+    filename = '%s/%s' % (root_dir, item)
     file_meta = self.get_meta(filename)
     cut_times = []
     file_list = []
@@ -61,14 +62,17 @@ class fix_playon:
     service = self.settings['services'][provider]
 
     for chapter in chapter_list:
-      if chapter['start_time'] == '0.000000' and float(chapter['start_time']) < 10.0:
+      if chapter['start_time'] == '0.000000' and float(chapter['end_time']) < 10.0:
         continue
       if chapter['tags']['title'] == 'Advertisement':
         continue
-      cut_times.append([float(chapter['start_time']), float(chapter['end_time'])])
+      if chapter['start_time'] == '0.000000':
+        cut_times.append([service['start_cut'], float(chapter['end_time'])])
+      else:
+        cut_times.append([float(chapter['start_time']), float(chapter['end_time'])])
 
     if service["use_comskip"].lower() == "true":
-      cut_times = self.use_comskip(filename, file_meta)
+      cut_times = self.use_comskip(root_dir, item, file_meta)
       logging.info(chapter_list)
     if chapter_list == []: #netflix and HBOGO movies don't have chapters
       if not service == "":
@@ -79,11 +83,11 @@ class fix_playon:
         cut_times =   [['6.0',end_time]]
     else:
       end_segment = cut_times.pop()
-      end_segment[1] = float(end_segment[1]) - 10
+      end_segment[1] = float(end_segment[1]) - service['end_cut']
       cut_times.append(end_segment)
 
     count = 0
-    splitfile = filename.split("\\")[-1].split('.mp4')[0]
+    splitfile = item.split('.mp4')[0]
     concat_file_name = '%s/%s.concat.list' % (self.work_dir,splitfile)
     concat_file = open(concat_file_name, 'w')
     for segment in cut_times:
@@ -137,9 +141,9 @@ class fix_playon:
 
             print "fixed files and dirs in %s, now retrying" % root
             return "try again"
-          if item == "Unforgettable.mp4":
+          #if item == "Unforgettable.mp4":
             #print root
-            self.convert('%s\%s' % (root, item), out_dir)
+          self.convert(root, item, out_dir)
     #when all dirs and files have been processed, set as done, and script will exit
     print "made it to the done"
     self.action = "done"
@@ -164,12 +168,13 @@ class fix_playon:
       except:
         pass
 
-  def use_comskip(self, filename, file_meta):
-    cmd = [self.settings['comskip'], '--output', self.work_dir, '--ini', self.settings["comskip_ini"], filename]
+  def use_comskip(self, root_dir, item, file_meta):
+    filename = '%s/%s' % (root_dir, item)
+    cmd = [self.settings['comskip'], '--output', root_dir, '--ini', self.settings["comskip_ini"], filename]
     logging.info('[comskip] Command: %s' % cmd)
     #subprocess.call(cmd)
 
-    edl_file = '%s/%s.edl' % (self.work_dir,filename.split("\\")[-1].split(".mp4")[0])
+    edl_file = '%s/%s.edl' % (root_dir,item.split(".mp4")[0])
     logging.info('Using EDL: ' + edl_file)
     segments = []
     prev_segment_end = 0.0
