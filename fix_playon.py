@@ -43,7 +43,7 @@ class fix_playon:
   def get_meta(self,filename):
     cmd_list = [self.settings['ffprobe'],'-v','quiet','-print_format','json','-show_chapters','-show_format',filename]
     result = subprocess.Popen(cmd_list, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
-    logging.info("FFProbe command: %s" % cmd_list)
+    logging.info("FFProbe command: %s" % " ".join(cmd_list))
     raw_string = result.stdout.read()
     return json.loads(raw_string)
 
@@ -95,7 +95,7 @@ class fix_playon:
       file_list.append(outfile)
       concat_file.write("file '%s-%s.mp4'\n" % (splitfile,count))
       cmd_list = [self.settings['ffmpeg'],'-i','%s' % filename, '-map_metadata', '-1', '-ss', str(segment[0]), '-to', str(segment[1]), '-c', 'copy', '%s' %  outfile]
-      logging.info("FFMpeg command: %s" % cmd_list)
+      logging.info("FFMpeg command: %s" % " ".join(cmd_list))
       result = subprocess.Popen(cmd_list, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
       raw_string = result.communicate()
       count += 1
@@ -106,7 +106,7 @@ class fix_playon:
       shutil.move('%s/%s-0.mp4' % (self.work_dir,splitfile), final_out)
     else:
       cmd_list = [self.settings['ffmpeg'],'-f','concat', '-safe', '0', '-i', '%s' % concat_file_name, '-c', 'copy', '%s' %  final_out]
-      logging.info("FFMpeg command: %s" % cmd_list)
+      logging.info("FFMpeg command: %s" % " ".join(cmd_list))
       result = subprocess.Popen(cmd_list, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
       raw_string = result.communicate()
 
@@ -171,7 +171,7 @@ class fix_playon:
   def use_comskip(self, root_dir, item, file_meta):
     filename = '%s/%s' % (root_dir, item)
     cmd = [self.settings['comskip'], '--output', root_dir, '--ini', self.settings["comskip_ini"], filename]
-    logging.info('[comskip] Command: %s' % cmd)
+    logging.info('[comskip] Command: %s' % " ".join(cmd))
     #subprocess.call(cmd)
 
     edl_file = '%s/%s.edl' % (root_dir,item.split(".mp4")[0])
