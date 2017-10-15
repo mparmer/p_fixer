@@ -88,10 +88,13 @@ class fix_playon:
 
     count = 0
     splitfile = item.split('.mp4')[0]
+    final_out = '%s/%s.mp4' % (out_dir,splitfile)
     concat_file_name = '%s/%s.concat.list' % (self.work_dir,splitfile)
     concat_file = open(concat_file_name, 'w')
     for segment in cut_times:
       outfile = '%s/%s-%s.mp4' % (self.work_dir,splitfile,count)
+      if len(cut_times) == 1:
+        outfile = final_out
       file_list.append(outfile)
       concat_file.write("file '%s-%s.mp4'\n" % (splitfile,count))
       cmd_list = [self.settings['ffmpeg'],'-i','%s' % filename, '-map_metadata', '-1', '-ss', str(segment[0]), '-to', str(segment[1]), '-c', 'copy', '%s' %  outfile]
@@ -101,10 +104,7 @@ class fix_playon:
       count += 1
     concat_file.close()
 
-    final_out = '%s/%s.mp4' % (out_dir,splitfile)
-    if len(cut_times) == 1:
-      shutil.move('%s/%s-0.mp4' % (self.work_dir,splitfile), final_out)
-    else:
+    if len(cut_times) > 1:
       cmd_list = [self.settings['ffmpeg'],'-f','concat', '-safe', '0', '-i', '%s' % concat_file_name, '-c', 'copy', '%s' %  final_out]
       logging.info("FFMpeg command: %s" % " ".join(cmd_list))
       result = subprocess.Popen(cmd_list, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
