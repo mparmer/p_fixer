@@ -1,3 +1,6 @@
+import subprocess, os, json, shutil, time, logging, uuid
+from os import system, walk, makedirs, listdir, renames
+from sys import exit
 
 class manual_fix:
   def __init__(self):
@@ -43,10 +46,8 @@ class manual_fix:
       out_dir = self.settings['watch_dir']
       for item in files:
         if item.endswith('.mp4') or item.endswith('.ts'):
-          print start_file
+          print item
           # check to make sure the file modification time is older than 5 minutes
-          if (os.stat(start_file)[8] + 300) > time.time():
-            continue # when it is not, skip this file
           self.convert(root, item, out_dir)
     #when all dirs and files have been processed, set as done, and script will exit
     print "made it to the done"
@@ -87,6 +88,7 @@ class manual_fix:
           prev_segment_end = end
     else:
       print "Uh Oh, couldn't find EDL file %s" % edl_file
+      exit(0)
 
     # Write the final keep segment from the end of the last commercial break to the end of the file.
     keep_segment = [float(prev_segment_end), float(file_meta['format']['duration'])]
@@ -104,11 +106,11 @@ class manual_fix:
     concat_file_name = '%s/%s.concat.list' % (self.work_dir,splitfile)
     concat_file = open(concat_file_name, 'w')
     for segment in cut_times:
-      outfile = '%s/%s-%s' % (self.work_dir,splitfile,count)
+      outfile = '%s/%s-%s%s' % (self.work_dir,splitfile,count,suffix)
       if len(cut_times) == 1:
         outfile = final_out
       file_list.append(outfile)
-      concat_file.write("file '%s-%s'\n" % (splitfile,count))
+      concat_file.write("file '%s-%s%s'\n" % (splitfile,count,suffix))
       cmd_list = [self.settings['ffmpeg'],'-i','%s' % filename, '-map_metadata', '-1', '-ss', str(segment[0]), '-to', str(segment[1]), '-c', 'copy', '%s' %  outfile]
       logging.info("FFMpeg command: %s" % " ".join(cmd_list))
       result = subprocess.Popen(cmd_list, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
@@ -137,4 +139,3 @@ class manual_fix:
 
 if __name__ == "__main__":
   manual_fix()
-
