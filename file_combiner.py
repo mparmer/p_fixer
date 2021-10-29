@@ -73,8 +73,7 @@ class auto_combine:
       logging.info("FFMpeg command: %s" % " ".join(cmd_list))
       result = subprocess.Popen(cmd_list, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
       raw_string = result.communicate()
-#.\youtube-dl.exe -v --ap-username yourcomcastusername --ap-password yourcomcastpassword --ap-mso Comcast_SSO http://www.cc.com/episodes/jpstyr/idiotsitter-pilot-season-1-ep-101
+#.\youtube-dl.exe -v --ap-username yourcomcastusername --ap-password yourcomcastpassword --ap-mso Comcast_SSO url_of_episode
 
-#.\youtube-dl.exe -v --ap-username parmer09 --ap-password 1bowling --ap-mso Comcast_SSO
 if __name__ == "__main__":
   auto_combine()
